@@ -23,7 +23,7 @@ public class VehicleRepository : IVehicleRepository
     }
 
     public Task<Vehicle> GetByPlate(LicensePlate licensePlate) =>
-        _db.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == licensePlate);
+        _db.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate.BaseNumber == licensePlate.BaseNumber && v.LicensePlate.Region == licensePlate.Region);
 
     public Task<VehicleRegistration> GetRegistrationById(Guid id) => _db.VehicleRegistrations.FirstOrDefaultAsync(v => v.Id == id);
 

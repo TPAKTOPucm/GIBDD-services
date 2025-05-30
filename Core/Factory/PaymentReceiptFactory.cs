@@ -1,12 +1,16 @@
 ﻿using Core.Aggregates.Fine.Entities;
+using Core.DTOs;
 
 namespace Core.Factory;
 
 public static class PaymentReceiptFactory
 {
-    public static Task<PaymentReceipt> Create()
+    public static string PriceServiceUrl { get; set; }
+    public static async Task<PaymentReceipt> Create(PaymentReceiptFactoryDto dto)
     {
-
-        
+        using var client = new HttpClient();
+        var response = await client.PostAsync(PriceServiceUrl, JsonContent.Create<PaymentReceiptFactoryDto>(dto));
+        var receiptDto = await response.Content.ReadFromJsonAsync<PaymentReceiptDto>();
+        return new PaymentReceipt(receiptDto.Id, receiptDto.Price, receiptDto.BankCode, receiptDto.AccountCode);
     }
 }

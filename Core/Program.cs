@@ -11,15 +11,22 @@ using Core.Factory;
 
 var builder = WebApplication.CreateBuilder(args);
 
+PaymentReceiptFactory.PriceServiceUrl = builder.Configuration.GetConnectionString("PriceService");
+
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddDbContext<CarsContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres"))
 );
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 builder.Services.AddScoped<IDriverRepository, DriverRepository>();
 builder.Services.AddScoped<IFineRepository, FineRepository>();
 
 var app = builder.Build();
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.MapPost("/api/drivers", async (IDriverRepository repository, [FromBody] CreateDriverRequest request) =>
 {
@@ -70,7 +77,7 @@ app.MapPost("/api/fines/{id}/pay", async (IFineRepository fineRepository, Guid i
 app.MapGet("/api/drivers/{driverId}/vehicles", async (IVehicleRepository vehicleRepository, Guid driverId) =>
     await vehicleRepository.GetByDriverId(driverId));
 
-app.MapGet("/api/vehicles/fines", async (IFineRepository fineRepository, LicensePlate plate) =>
+app.MapPost("/api/vehicles/fines", async (IFineRepository fineRepository, LicensePlate plate) =>
     await fineRepository.GetByVehiclePlate(plate));
 
 app.MapPost("/api/fines", async (IVehicleRepository vehicleRepository, IFineRepository fineRepository, [FromBody] IssueFineRequest request) =>
@@ -78,7 +85,7 @@ app.MapPost("/api/fines", async (IVehicleRepository vehicleRepository, IFineRepo
     var vehicle = await vehicleRepository.GetByPlate(request.Plate);
     if (vehicle is null)
         return Results.NotFound();
-    var receipt = await PaymentReceiptFactory.Create();
+    var receipt = await PaymentReceiptFactory.Create(new (request.Reason, request.IssueDate));
     var fine = new Fine(request.Reason, request.IssueDate, receipt, vehicle);
     await fineRepository.Add(fine);
     return Results.Ok();

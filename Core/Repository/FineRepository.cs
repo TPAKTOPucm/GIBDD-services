@@ -19,7 +19,7 @@ public class FineRepository : IFineRepository
     }
 
     public Task<List<Fine>> GetByVehiclePlate(LicensePlate plate) =>
-        _db.Fines.Where(f => f.Vehicle.LicensePlate == plate).ToListAsync();
+        _db.Fines.Where(f => f.Vehicle.LicensePlate.Region == plate.Region && f.Vehicle.LicensePlate.BaseNumber == plate.BaseNumber).ToListAsync();
 
     public Task<Fine> GetById(Guid id) =>
         _db.Fines.Include(f => f.Receipt).FirstOrDefaultAsync(f => f.Id == id);

@@ -9,7 +9,7 @@ namespace Core.Aggregates.Fine;
 public class Fine : Aggregate<Guid>
 {
     ILazyLoader _lazyLoader;
-    PaymentReceipt _paymentReceipt;
+    PaymentReceipt _receipt;
     protected Fine(ILazyLoader lazyLoader) { }
     public Fine(string reason, DateTime issueDate, PaymentReceipt paymentReceipt, Vehicle vehicle)
     {
@@ -17,17 +17,17 @@ public class Fine : Aggregate<Guid>
             throw new ArgumentNullException();
         Reason = reason;
         IssueDate = issueDate;
-        _paymentReceipt = paymentReceipt;
+        _receipt = paymentReceipt;
         Vehicle = vehicle;
-        AddDomainEvent(new FineCreatedEvent(Id, Reason, issueDate, CreationDate, vehicle.LicensePlate, _paymentReceipt.Price));
+        AddDomainEvent(new FineCreatedEvent(Id, Reason, issueDate, CreationDate, vehicle.LicensePlate, _receipt.Price));
     }
-    public Guid Id { get; }
-    public PaymentReceipt Receipt { get => _lazyLoader.Load(this, ref _paymentReceipt); }
-    public Vehicle Vehicle { get; }
+    public Guid Id { get; init; }
+    public PaymentReceipt Receipt { get => _lazyLoader.Load(this, ref _receipt); private set => _receipt = value; }
+    public Vehicle Vehicle { get; init; }
     public bool IsPaid { get => Receipt.PaymentTransactionId is not null; }
-    public string Reason { get; }
-    public DateTime IssueDate { get; }
-    public DateTime CreationDate { get; } = DateTime.UtcNow;
+    public string Reason { get; init; }
+    public DateTime IssueDate { get; init; }
+    public DateTime CreationDate { get; init; } = DateTime.UtcNow;
 
     public bool Pay(Guid transactionId)
     {

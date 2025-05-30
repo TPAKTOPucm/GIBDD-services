@@ -4,10 +4,11 @@ namespace Core.Aggregates.VehicleRegistration.Entities;
 
 public class Driver : Entity<Guid>
 {
-    public Guid Id { get; }
-    public FullName FullName { get; }
-    public DateTime BirthDate { get; }
-    public Address Address { get; }
+    protected Driver() { }
+    public Guid Id { get; init; }
+    public FullName FullName { get; init; }
+    public DateTime BirthDate { get; init; }
+    public Address Address { get; private set; }
 
     public Driver(FullName fullName, DateTime birthDate, Address address)
     {

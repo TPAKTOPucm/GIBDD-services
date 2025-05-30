@@ -6,13 +6,14 @@ namespace Core.Aggregates.VehicleRegistration;
 
 public class VehicleRegistration : Aggregate<Guid>
 {
-    public Guid VehicleId { get; }
-    public Vehicle Vehicle { get; }
-    public Guid DriverId { get; }
-    public Driver Driver { get; }
-    public DateTime RegistrationDate { get; }
+    public Guid VehicleId { get; init; }
+    public Vehicle Vehicle { get; init; }
+    public Guid DriverId { get; init; }
+    public Driver Driver { get; init; }
+    public DateTime RegistrationDate { get; init; }
     public DateTime? DeregistrationDate { get; private set; }
 
+    protected VehicleRegistration() { }
     public VehicleRegistration(Vehicle vehicle, Driver driver, LicensePlate licensePlate, IEnumerable<Vehicle> vehicles)
     {
         Vehicle = vehicle;

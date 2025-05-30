@@ -21,3 +21,6 @@ public class DriverDto
 public record IssueFineRequest(LicensePlate Plate, string Reason, DateTime IssueDate);
 public record ConfiscateRequest(string Reason);
 public record CreateDriverRequest(FullName FullName, DateTime BirthDate, Address Address);
+
+public record PaymentReceiptDto(Guid Id, decimal Price, ulong BankCode, ulong AccountCode);
+public record PaymentReceiptFactoryDto(string Reason, DateTime IssueDate);

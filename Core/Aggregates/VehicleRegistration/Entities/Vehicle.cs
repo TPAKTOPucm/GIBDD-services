@@ -16,10 +16,10 @@ public class Vehicle : Entity<Guid>
         Make = make;
         Model = model;
     }
-    public Guid Id { get; }
+    public Guid Id { get; init; }
     public LicensePlate? LicensePlate { get; private set; }
-    public string Make { get; }
-    public string Model { get; }
+    public string Make { get; init; }
+    public string Model { get; init; }
     public bool IsConfiscated { get => ConfiscationReason is not null; }
     public string? ConfiscationReason { get; private set; }
     public ICollection<Fine.Fine> Fines { get => _lazyLoader.Load(this, ref _fines); }
@@ -37,7 +37,7 @@ public class Vehicle : Entity<Guid>
 
     public bool Register(LicensePlate licensePlate, IEnumerable<Vehicle> vehicles)
     {
-        if (LicensePlate is not null || vehicles.Any(v => v.LicensePlate == licensePlate))
+        if (LicensePlate is not null || vehicles.Any(v => v?.LicensePlate == licensePlate))
             return false;
         LicensePlate = licensePlate;
         return true;
