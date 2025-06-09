@@ -1,0 +1,6 @@
+@Confiscation_HostAddress = http://localhost:5033
+
+GET {{Confiscation_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

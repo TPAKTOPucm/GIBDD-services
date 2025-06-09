@@ -1,37 +1,18 @@
 package main
 
 import (
-	"bytes"
-	"database/sql"
+	"context"
 	"encoding/json"
-	"flag"
-	"fmt"
 	"log"
 	"math/rand"
-	"net/http"
+	"os"
+	"strconv"
 	"time"
 
-	"github.com/IBM/sarama"
-	_ "github.com/lib/pq"
+	"github.com/google/uuid"
+	"github.com/segmentio/kafka-go"
 )
 
-type Car struct {
-	BaseNumber string `json:"baseNumber"`
-	Region     int    `json:"region"`
-}
-
-type Plate struct {
-	BaseNumber string `json:"baseNumber"`
-	Region     int    `json:"region"`
-}
-
-type FineRequest struct {
-	Plate     Plate  `json:"plate"`
-	Reason    string `json:"reason"`
-	IssueDate string `json:"issueDate"`
-}
-
-// FineReason enum-like type
 type FineReason string
 
 const (
@@ -45,159 +26,135 @@ const (
 	ExpiredDocuments  FineReason = "expired registration or insurance"
 )
 
-var allFineReasons = []FineReason{
-	Speeding2040,
-	Speeding4060,
-	Speeding60Plus,
-	RedLightViolation,
-	NoParking,
-	SeatbeltViolation,
-	InvalidParking,
-	ExpiredDocuments,
+type LicensePlate struct {
+	BaseNumber string `json:"BaseNumber"`
+	Region     int    `json:"Region"`
 }
 
-func randomFineReason() FineReason {
-	return allFineReasons[rand.Intn(len(allFineReasons))]
+type Vehicle struct {
+	LicensePlate LicensePlate `json:"LicensePlate"`
+	Make         string       `json:"Make"`
+	Model        string       `json:"Model"`
+}
+
+type Fine struct {
+	ID        string     `json:"Id"`
+	Reason    FineReason `json:"Reason"`
+	IssueDate string     `json:"IssueDate"`
+	Vehicle   Vehicle    `json:"Vehicle"`
 }
 
 var (
-	minDelay       = flag.Int("min_delay", 30, "Minimum delay between fines in seconds")
-	maxDelay       = flag.Int("max_delay", 180, "Maximum delay between fines in seconds")
-	dbConnStr      = flag.String("db_conn", "", "Database connection string")
-	kafkaConnStr   = flag.String("kafka_conn", "", "Kafka connection string")
-	fineServiceURL = flag.String("fine_service_url", "", "URL of the fine processing service")
+	reasons = []FineReason{
+		Speeding2040,
+		Speeding4060,
+		Speeding60Plus,
+		RedLightViolation,
+		NoParking,
+		SeatbeltViolation,
+		InvalidParking,
+		ExpiredDocuments,
+	}
+	makesModels = map[string][]string{
+		"Toyota":  {"Camry", "Corolla", "RAV4"},
+		"Nissan":  {"Almera", "Qashqai", "X-Trail"},
+		"Hyundai": {"Solaris", "Creta", "Tucson"},
+		"Kia":     {"Rio", "Sportage", "Optima"},
+		"Lada":    {"Vesta", "Granta", "Niva"},
+	}
+	letterRunes = []rune("ETOPAHKXCBM")
+	numRunes    = []rune("0123456789")
 )
-
-func main() {
-	flag.Parse()
-
-	// Validate required flags
-	if *dbConnStr == "" || *kafkaConnStr == "" || *fineServiceURL == "" {
-		log.Fatal("Missing required flags: db_conn, kafka_conn and fine_service_url must be provided")
-	}
-
-	// Validate delay values
-	if *minDelay <= 0 || *maxDelay <= 0 || *minDelay > *maxDelay {
-		log.Fatal("Invalid delay values: min_delay must be <= max_delay and both must be positive")
-	}
-
-	// Initialize database connection
-	db, err := sql.Open("postgres", *dbConnStr)
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal("Database ping failed:", err)
-	}
-
-	// Create cars table if not exists
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS cars (
-		base_number TEXT NOT NULL,
-		region INTEGER NOT NULL,
-		PRIMARY KEY (base_number, region)
-	)`)
-	if err != nil {
-		log.Fatal("Failed to create table:", err)
-	}
-
-	// Initialize Kafka consumer
-	config := sarama.NewConfig()
-	config.Consumer.Return.Errors = true
-
-	consumer, err := sarama.NewConsumer([]string{*kafkaConnStr}, config)
-	if err != nil {
-		log.Fatal("Failed to create Kafka consumer:", err)
-	}
-	defer consumer.Close()
-
-	partitionConsumer, err := consumer.ConsumePartition("registered-cars", 0, sarama.OffsetNewest)
-	if err != nil {
-		log.Fatal("Failed to start partition consumer:", err)
-	}
-	defer partitionConsumer.Close()
-
-	// Start Kafka consumer goroutine
-	go func() {
-		for {
-			select {
-			case msg := <-partitionConsumer.Messages():
-				var car Car
-				if err := json.Unmarshal(msg.Value, &car); err != nil {
-					log.Printf("Failed to unmarshal car: %v", err)
-					continue
-				}
-
-				_, err := db.Exec(
-					"INSERT INTO cars (base_number, region) VALUES ($1, $2) ON CONFLICT (base_number, region) DO NOTHING",
-					car.BaseNumber,
-					car.Region,
-				)
-				if err != nil {
-					log.Printf("Failed to insert car: %v", err)
-				}
-
-			case err := <-partitionConsumer.Errors():
-				log.Printf("Kafka consumer error: %v", err)
-			}
-		}
-	}()
-
-	// Start fine issuance loop with random delays
-	for {
-		delay := time.Duration(rand.Intn(*maxDelay-*minDelay+1)+*minDelay) * time.Second
-		time.Sleep(delay)
-
-		var car Car
-		err := db.QueryRow(
-			"SELECT base_number, region FROM cars ORDER BY RANDOM() LIMIT 1",
-		).Scan(&car.BaseNumber, &car.Region)
-
-		if err != nil {
-			if err == sql.ErrNoRows {
-				log.Println("No cars available for fine issuance")
-				continue
-			}
-			log.Printf("Failed to select random car: %v", err)
-			continue
-		}
-
-		fine := FineRequest{
-			Plate: Plate{
-				BaseNumber: car.BaseNumber,
-				Region:     car.Region,
-			},
-			Reason:    string(randomFineReason()),
-			IssueDate: time.Now().Format(time.RFC3339),
-		}
-
-		body, err := json.Marshal(fine)
-		if err != nil {
-			log.Printf("Failed to marshal fine: %v", err)
-			continue
-		}
-
-		resp, err := http.Post(
-			fmt.Sprintf("%s/api/fines", *fineServiceURL),
-			"application/json",
-			bytes.NewReader(body),
-		)
-		if err != nil {
-			log.Printf("Failed to send fine: %v", err)
-			continue
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Unexpected response status: %d", resp.StatusCode)
-		} else {
-			log.Printf("Successfully sent fine for %s-%d: %s", car.BaseNumber, car.Region, fine.Reason)
-		}
-	}
-}
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
+}
+
+func main() {
+	kafkaURL := os.Getenv("KAFKA_CONNECTION")
+	minInterval, _ := strconv.Atoi(os.Getenv("MIN_INTERVAL"))
+	maxInterval, _ := strconv.Atoi(os.Getenv("MAX_INTERVAL"))
+
+	if minInterval < 1 || maxInterval < 1 || maxInterval < minInterval {
+		log.Panic("Illegal arguments")
+	}
+
+	writer := kafka.NewWriter(kafka.WriterConfig{
+		Brokers:  []string{kafkaURL},
+		Topic:    "violations",
+		Balancer: &kafka.LeastBytes{},
+	})
+	defer writer.Close()
+
+	for {
+		interval := rand.Intn(maxInterval-minInterval) + minInterval
+		fine := generateRandomFine()
+
+		data, err := json.Marshal(fine)
+		if err != nil {
+			log.Printf("Error marshaling fine: %v", err)
+			continue
+		}
+
+		msg := kafka.Message{
+			Key:   []byte(fine.ID),
+			Value: data,
+		}
+
+		if err := writer.WriteMessages(context.Background(), msg); err != nil {
+			log.Printf("Failed to write message: %v", err)
+		} else {
+			log.Printf("Sent fine %s to %s%d", fine.ID, fine.Vehicle.LicensePlate.BaseNumber, fine.Vehicle.LicensePlate.Region)
+		}
+
+		time.Sleep(time.Duration(interval) * time.Second)
+	}
+}
+
+func generateRandomFine() Fine {
+	make := randomMake()
+	return Fine{
+		ID:        uuid.NewString(),
+		Reason:    randomReason(),
+		IssueDate: time.Now().Format(time.RFC3339),
+		Vehicle: Vehicle{
+			LicensePlate: generateLicensePlate(),
+			Make:         make,
+			Model:        randomModel(make),
+		},
+	}
+}
+
+func generateLicensePlate() LicensePlate {
+	return LicensePlate{
+		BaseNumber: randomString(letterRunes, 1) +
+			randomString(numRunes, 3) +
+			randomString(letterRunes, 2),
+		Region: rand.Intn(99) + 1,
+	}
+}
+
+func randomString(runes []rune, length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = runes[rand.Intn(len(runes))]
+	}
+	return string(b)
+}
+
+func randomReason() FineReason {
+	return reasons[rand.Intn(len(reasons))]
+}
+
+func randomMake() string {
+	makes := make([]string, 0, len(makesModels))
+	for k := range makesModels {
+		makes = append(makes, k)
+	}
+	return makes[rand.Intn(len(makes))]
+}
+
+func randomModel(make string) string {
+	models := makesModels[make]
+	return models[rand.Intn(len(models))]
 }
