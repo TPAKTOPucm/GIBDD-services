@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using FineService.Mediators;
 using Confluent.Kafka;
 using FineService.Services;
+using FineService.Aggregates.Fine.Events;
+using FineService.Aggregates.Fine.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +27,7 @@ var consumerConfig = new ConsumerConfig
 
 builder.Services.AddSingleton(consumerConfig);
 
-builder.Services.AddSingleton<IMediator>(new KafkaMediator(new ProducerConfig(consumerConfig)));
+builder.Services.AddSingleton<IMediator>(new KafkaMediator(new ProducerConfig { BootstrapServers = consumerConfig.BootstrapServers}));
 
 builder.Services.AddDbContext<FinesContext>(options =>
 	options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")), ServiceLifetime.Scoped, ServiceLifetime.Singleton
@@ -60,9 +62,11 @@ app.MapDelete("/api/{id}", async (Guid id, [FromServices] IFineRepository reposi
 	return Results.Ok();
 }).WithOpenApi();
 
-app.MapPost("/api/{id}", async (Guid id, [FromServices] IFineRepository repository) =>
+app.MapPost("/api/{id}", async (Guid id, [FromServices] IFineRepository repository, [FromServices] IMediator mediator) =>
 {
 	var fine = await repository.GetById(id);
+	if (fine is null)
+		return Results.NotFound();
 	var receipt = await PaymentReceiptFactory.Create(new(fine.Reason, fine.IssueDate));
 	if (!fine.Confirm(receipt))
 		return Results.BadRequest();

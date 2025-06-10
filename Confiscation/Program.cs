@@ -22,12 +22,12 @@ var consumerConfig = new ConsumerConfig {
 	BootstrapServers = builder.Configuration.GetConnectionString("Kafka"),
 	AutoOffsetReset = AutoOffsetReset.Earliest
 };
-var producerConfig = new ProducerConfig(consumerConfig);
+var producerConfig = new ProducerConfig { BootstrapServers = consumerConfig.BootstrapServers };
 
 builder.Services.AddSingleton(consumerConfig);
 
 builder.Services.AddDbContext<ConfiscationContext>(options =>
-	options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres"))
+	options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")), ServiceLifetime.Scoped, ServiceLifetime.Singleton
 );
 
 builder.Services.AddHostedService<FineCounterService>();
@@ -55,7 +55,7 @@ app.MapPost("/api/confiscate", async ([FromBody] ConfiscationOrderDto dto, [From
 	if (confiscationOrder.Reason == ConfiscationReason.UnpaidFines)
 	{
 		var finesNumber = await db.Vehicles
-			.Where(v => v.LicensePlate.BaseNumber == dto.LicensePlate.BaseNumber &&
+			.Where(v => v.LicensePlate != null && v.LicensePlate.BaseNumber == dto.LicensePlate.BaseNumber &&
 				v.LicensePlate.Region == dto.LicensePlate.Region).Select(v => v.UnpaidFineCount)
 			.FirstOrDefaultAsync();
 		if (finesNumber < FINE_COUNT)
@@ -71,7 +71,7 @@ app.MapPost("/api/confiscate", async ([FromBody] ConfiscationOrderDto dto, [From
 
 app.MapDelete("/api/confiscate", async ([FromBody] LicensePlate licensePlate, [FromServices] ConfiscationContext db) =>
 {
-	var order = await db.ConfiscationOrders.Where(co => !co.IsReturned && co.LicensePlate.BaseNumber == licensePlate.BaseNumber &&
+	var order = await db.ConfiscationOrders.Where(co => !co.IsReturned && co.LicensePlate != null && co.LicensePlate.BaseNumber == licensePlate.BaseNumber &&
 	co.LicensePlate.Region == licensePlate.Region).FirstOrDefaultAsync();
 	if (order is null)
 		return Results.NotFound();

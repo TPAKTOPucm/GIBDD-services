@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
 
 namespace ConfiscationService.Models;
 
@@ -8,7 +7,7 @@ public record LicensePlate(string BaseNumber, uint Region);
 
 public class Vehicle
 {
-	[Key]
+	public Guid Id { get; set; }
 	public LicensePlate LicensePlate { get; set; }
 	public uint UnpaidFineCount { get; set; }
 }

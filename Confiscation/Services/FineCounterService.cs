@@ -3,6 +3,7 @@ using ConfiscationService.Data;
 using System.Text.Json;
 using ConfiscationService.Aggregates.Fine.Events;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace ConfiscationService.Services;
 
@@ -10,9 +11,9 @@ public class FineCounterService : BackgroundService
 {
     private readonly ConfiscationContext _db;
     private readonly ConsumerConfig _consumerConfig;
-    public FineCounterService(ConfiscationContext db, ConsumerConfig config)
+    public FineCounterService(DbContextOptions options, ConsumerConfig config)
     {
-        _db = db;
+        _db = new ConfiscationContext(options);
         _consumerConfig = config;
     }
 
@@ -23,7 +24,7 @@ public class FineCounterService : BackgroundService
             consumer.Subscribe("fines");
             while (!stoppingToken.IsCancellationRequested)
             {
-                var fine = JsonSerializer.Deserialize<FineStatusChanged>(consumer.Consume(stoppingToken).Value);
+                var fine = JsonSerializer.Deserialize<FineStatusChanged>(consumer.Consume(stoppingToken).Value, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter()} });
                 var vehicle = await _db.Vehicles.Where(v => v.LicensePlate.BaseNumber == fine.LicensePlate.BaseNumber && v.LicensePlate.Region == fine.LicensePlate.Region)
                         .FirstOrDefaultAsync();
                 if (vehicle is null)

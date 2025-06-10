@@ -48,14 +48,14 @@ func main() {
 	policeAddr := flag.String("policeAddress", "http://localhost:8080/notifications", "Police API endpoint")
 	flag.Parse()
 
-	go gg(*kafkaConn, *policeAddr)
-
 	go confiscationNotifications(*kafkaConn)
 
-	finesNotifications(*kafkaConn)
+	go finesNotifications(*kafkaConn)
+
+	violationNotifications(*kafkaConn, *policeAddr)
 }
 
-func gg(kafkaConn, policeAddr string) {
+func violationNotifications(kafkaConn, policeAddr string) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{kafkaConn},
 		Topic:   "violations",
@@ -63,7 +63,7 @@ func gg(kafkaConn, policeAddr string) {
 	})
 	defer reader.Close()
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 25 * time.Second}
 
 	for {
 		msg, err := reader.ReadMessage(context.Background())
@@ -149,12 +149,12 @@ func finesNotifications(kafkaConn string) {
 		}
 
 		switch fine.Status {
-		case Confirmed:
-			log.Printf("Выписан штраф ID: %s. Пользователь уведомлён", fine.ID)
 		case Rejected:
 			log.Printf("Обжалован штраф ID: %s. Пользователь уведомлён", fine.ID)
 		case Paid:
 			log.Printf("Оплата штрафа ID: %s прошла успешно. Пользователь уведомлён", fine.ID)
 		}
+
+		log.Printf("Выписан штраф ID: %s. Пользователь уведомлён", fine.ID)
 	}
 }

@@ -49,21 +49,24 @@ func main() {
 
 		w.WriteHeader(http.StatusOK)
 
-		url := *baseURL + "/" + fine.ID
+		go func() {
+			time.Sleep(20 * time.Second) // пользователь проверяет корректность штрафа
+			url := *baseURL + "/" + fine.ID
 
-		req, err := http.NewRequest(http.MethodPost, url, nil)
-		if err != nil {
-			log.Printf("Failed to create POST request: %v", err)
-			return
-		}
+			req, err := http.NewRequest(http.MethodPost, url, nil)
+			if err != nil {
+				log.Printf("Failed to create POST request: %v", err)
+				return
+			}
 
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("POST request to %s failed: %v", url, err)
-			return
-		}
-		resp.Body.Close()
-		log.Printf("POST request to %s completed with status %s", url, resp.Status)
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("POST request to %s failed: %v", url, err)
+				return
+			}
+			resp.Body.Close()
+			log.Printf("POST request to %s completed with status %s", url, resp.Status)
+		}()
 	})
 
 	log.Printf("Police service listening on :%s, forwarding to baseUrl=%s", *port, *baseURL)

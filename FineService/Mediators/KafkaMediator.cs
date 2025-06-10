@@ -14,10 +14,14 @@ public class KafkaMediator : IMediator
 
     public Task Publish(object notification)
 	{
-		using var kafkaProducer = new ProducerBuilder<Ignore, string>(_config).Build();
-		return kafkaProducer.ProduceAsync("fines", new Message<Ignore, string>
+		using var kafkaProducer = new ProducerBuilder<string, string>(_config).Build();
+		Console.WriteLine("\n\n\n\n\n");
+		return kafkaProducer.ProduceAsync("fines", new Message<string, string>
 		{
+			Key = notification.GetHashCode().ToString(),
 			Value = JsonSerializer.Serialize(notification, new JsonSerializerOptions { Converters = {new JsonStringEnumConverter()}})
 		});
+
+		//Console.WriteLine($"Событие успешно опубликовано в топик {result.Topic}, партиция {result.Partition}, смещение {result.Offset}");
 	}
 }
