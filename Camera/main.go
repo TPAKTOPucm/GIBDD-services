@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"log"
 	"math/rand"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,23 +70,25 @@ func init() {
 }
 
 func main() {
-	kafkaURL := os.Getenv("KAFKA_CONNECTION")
-	minInterval, _ := strconv.Atoi(os.Getenv("MIN_INTERVAL"))
-	maxInterval, _ := strconv.Atoi(os.Getenv("MAX_INTERVAL"))
+	kafkaURL := flag.String("kafka_connection", "localhost:9092", "Kafka broker connection string")
+	minInterval := flag.Int("min_interval", 5, "Минимальный интервал между сообщениями в секундах")
+	maxInterval := flag.Int("max_interval", 15, "Максимальный интервал между сообщениями в секундах")
 
-	if minInterval < 1 || maxInterval < 1 || maxInterval < minInterval {
-		log.Panic("Illegal arguments")
+	flag.Parse()
+
+	if *minInterval < 1 || *maxInterval < 1 || *maxInterval < *minInterval {
+		log.Panic("Illegal arguments", minInterval, maxInterval)
 	}
 
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{kafkaURL},
+		Brokers:  []string{*kafkaURL},
 		Topic:    "violations",
 		Balancer: &kafka.LeastBytes{},
 	})
 	defer writer.Close()
 
 	for {
-		interval := rand.Intn(maxInterval-minInterval) + minInterval
+		interval := rand.Intn(*maxInterval-*minInterval) + *minInterval
 		fine := generateRandomFine()
 
 		data, err := json.Marshal(fine)

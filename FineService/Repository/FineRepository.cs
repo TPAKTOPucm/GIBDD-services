@@ -20,6 +20,7 @@ public class FineRepository : IFineRepository
 
     public Task Update(Fine fine)
     {
+        _db.Add(fine.Receipt);
         _db.Update(fine);
         return _db.SaveChangesAsync();
     }

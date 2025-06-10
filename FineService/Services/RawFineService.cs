@@ -28,11 +28,10 @@ public class RawFineService : BackgroundService
 			while (!stoppingToken.IsCancellationRequested)
 			{
 				var text = consumer.Consume(stoppingToken).Value;
-				_logger.LogInformation(text);
 				var dto = JsonSerializer.Deserialize<FineDto>(text);
-				var fine = new Fine(dto.id, dto.Reason, dto.IssueDate, dto.Vehicle);
+				var fine = new Fine(dto.Id, dto.Reason, dto.IssueDate.ToUniversalTime(), dto.Vehicle);
 				_db.Add(fine);
-				_logger.LogInformation($"Reserved fine {dto}");
+				_logger.LogInformation($"Reserved fine {dto.Id}");
 				await _db.SaveChangesAsync();
 			}
 		}

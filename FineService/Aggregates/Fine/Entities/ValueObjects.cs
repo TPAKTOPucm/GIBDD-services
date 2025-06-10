@@ -7,8 +7,8 @@ public record LicensePlate(string BaseNumber, uint Region);
 
 public enum FineStatus
 {
-	Confirmed,
 	Suspected,
+	Confirmed,
 	Rejected,
 	Paid
 }

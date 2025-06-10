@@ -8,7 +8,7 @@ namespace FineService.Aggregates.Fine;
 public class Fine : Aggregate<Guid>
 {
     ILazyLoader _lazyLoader;
-    PaymentReceipt _receipt;
+    Vehicle _vehicle;
     protected Fine(ILazyLoader lazyLoader)
     {
         _lazyLoader = lazyLoader;
@@ -24,8 +24,8 @@ public class Fine : Aggregate<Guid>
         Status = FineStatus.Suspected;
     }
     public Guid Id { get; init; }
-    public PaymentReceipt? Receipt { get => _lazyLoader.Load(this, ref _receipt); private set => _receipt = value; }
-    public Vehicle Vehicle { get; init; }
+    public PaymentReceipt? Receipt { get; private set; }
+    public Vehicle Vehicle { get => _lazyLoader.Load(this, ref _vehicle); private set => _vehicle = value; }
     public string Reason { get; init; }
     public DateTime IssueDate { get; init; }
     public DateTime? ConfirmationDate { get; private set; }
@@ -35,6 +35,7 @@ public class Fine : Aggregate<Guid>
     {
         if (Status != FineStatus.Suspected || receipt == null)
             return false;
+        receipt.FineId = Id;
         Receipt = receipt;
         Status = FineStatus.Confirmed;
         ConfirmationDate = DateTime.UtcNow;

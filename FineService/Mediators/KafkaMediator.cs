@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FineService.Mediators;
 
@@ -16,7 +17,7 @@ public class KafkaMediator : IMediator
 		using var kafkaProducer = new ProducerBuilder<Ignore, string>(_config).Build();
 		return kafkaProducer.ProduceAsync("fines", new Message<Ignore, string>
 		{
-			Value = JsonSerializer.Serialize(notification)
+			Value = JsonSerializer.Serialize(notification, new JsonSerializerOptions { Converters = {new JsonStringEnumConverter()}})
 		});
 	}
 }

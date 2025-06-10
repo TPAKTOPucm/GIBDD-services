@@ -16,6 +16,7 @@ public class PaymentReceipt : Entity<Guid>
     public decimal Price { get; init; }
     public ulong BankCode { get; init; }
     public ulong AccountCode { get; init; }
+    public Guid FineId { get; set; }
     public Guid? PaymentTransactionId { get; private set; }
     public DateTime? PaymentDate { get; private set; }
 

@@ -14,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+PaymentReceiptFactory.PriceServiceUrl = builder.Configuration.GetConnectionString("PriceService");
+
 var consumerConfig = new ConsumerConfig
 {
 	GroupId = "FineService",
@@ -29,6 +31,8 @@ builder.Services.AddDbContext<FinesContext>(options =>
 	options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")), ServiceLifetime.Scoped, ServiceLifetime.Singleton
 );
 
+builder.Services.AddScoped<IFineRepository, FineRepository>();
+
 builder.Services.AddHostedService<RawFineService>();
 
 var app = builder.Build();
@@ -41,13 +45,13 @@ if (app.Environment.IsDevelopment())
 }
 
 
-app.MapGet("/api/{id}", async (Guid id, IFineRepository repository) =>
+app.MapGet("/api/{id}", async (Guid id, [FromServices] IFineRepository repository) =>
 {
 	var fine = await repository.GetById(id);
 	return new { fine.Id, fine.Reason, fine.Vehicle, fine.IssueDate, fine.Status };
 }).WithOpenApi();
 
-app.MapDelete("/api/{id}", async (Guid id, IFineRepository repository) =>
+app.MapDelete("/api/{id}", async (Guid id, [FromServices] IFineRepository repository) =>
 {
 	var fine = await repository.GetById(id);
 	if (!fine.Reject())
@@ -56,7 +60,7 @@ app.MapDelete("/api/{id}", async (Guid id, IFineRepository repository) =>
 	return Results.Ok();
 }).WithOpenApi();
 
-app.MapPost("/api/{id}", async (Guid id, IFineRepository repository) =>
+app.MapPost("/api/{id}", async (Guid id, [FromServices] IFineRepository repository) =>
 {
 	var fine = await repository.GetById(id);
 	var receipt = await PaymentReceiptFactory.Create(new(fine.Reason, fine.IssueDate));
@@ -66,7 +70,7 @@ app.MapPost("/api/{id}", async (Guid id, IFineRepository repository) =>
 	return Results.Ok();
 }).WithOpenApi();
 
-app.MapPost("/api/payment/{id}", async (Guid id, [FromBody] Guid transactionId, IFineRepository repository) =>
+app.MapPost("/api/payment/{id}", async (Guid id, [FromBody] Guid transactionId, [FromServices] IFineRepository repository) =>
 {
 	var fine = await repository.GetById(id);
 	if (!fine.Pay(transactionId))

@@ -43,7 +43,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/api/confiscate", async ([FromBody] ConfiscationOrderDto dto, ConfiscationContext db) =>
+app.MapPost("/api/confiscate", async ([FromBody] ConfiscationOrderDto dto, [FromServices] ConfiscationContext db) =>
 {
 	var confiscationOrder = new ConfiscationOrder
 	{
@@ -69,7 +69,7 @@ app.MapPost("/api/confiscate", async ([FromBody] ConfiscationOrderDto dto, Confi
 	return Results.Ok();
 }).WithOpenApi();
 
-app.MapDelete("/api/confiscate", async ([FromBody] LicensePlate licensePlate, ConfiscationContext db) =>
+app.MapDelete("/api/confiscate", async ([FromBody] LicensePlate licensePlate, [FromServices] ConfiscationContext db) =>
 {
 	var order = await db.ConfiscationOrders.Where(co => !co.IsReturned && co.LicensePlate.BaseNumber == licensePlate.BaseNumber &&
 	co.LicensePlate.Region == licensePlate.Region).FirstOrDefaultAsync();

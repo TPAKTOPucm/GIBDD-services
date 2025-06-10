@@ -6,4 +6,4 @@ public record PaymentReceiptFactoryDto(string Reason, DateTime IssueDate);
 
 public record PaymentReceiptDto(Guid Id, decimal Price, ulong BankCode, ulong AccountCode);
 
-public record FineDto(Guid id, string Reason, DateTime IssueDate, Vehicle Vehicle);
+public record FineDto(Guid Id, string Reason, DateTime IssueDate, Vehicle Vehicle);
